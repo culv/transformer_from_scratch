@@ -7,6 +7,7 @@ from torch import nn
 from ops import scaled_dot_product_attention
 
 
+# i guess this is technically a sublayer
 class MultiHeadAttention(nn.Module):
     def __init__(
         self,
@@ -74,6 +75,49 @@ class MultiHeadAttention(nn.Module):
         return self.Wout(heads)
 
 
+class EncoderLayer(nn.Module):
+    def __init__(
+        self,
+        num_heads: int = 8,
+        d_model: int = 512,
+        d_feedforward: int = 2048,
+        dropout: float = 0.1,
+    ):
+        """todo: docstring"""
+        super().__init__()
+
+        self.multi_head_attention = MultiHeadAttention(num_heads, d_model)
+
+        self.multi_head_attention_layernorm = nn.LayerNorm(d_model)
+
+        self.feed_forward = nn.Sequential(
+            nn.Linear(d_model, d_feedforward),
+            nn.ReLU(),
+            nn.Linear(d_feedforward, d_model),
+        )
+
+        self.feed_forward_layernorm = nn.LayerNorm(d_model)
+
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(
+        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """todo: docstring"""
+        res = x
+        out = self.multi_head_attention(x, x, x, mask)
+        out = self.dropout(out)
+        out = out + res
+
+        res = self.multi_head_attention_layernorm(out)
+        out = self.feed_forward(res)
+        out = self.dropout(out)
+        out = out + res
+        out = self.feed_forward_layernorm(out)
+
+        return out
+
+
 if __name__ == "__main__":
     num_heads = 8
     d_model = 256
@@ -95,3 +139,7 @@ if __name__ == "__main__":
         ax.set_title(f"self-attention head {i}")
 
     plt.show()
+
+    d_ff = 2048
+    enc_block = EncoderLayer(num_heads=num_heads, d_model=d_model, d_feedforward=d_ff)
+    out = enc_block(x, mask)
