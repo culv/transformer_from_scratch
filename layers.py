@@ -11,38 +11,37 @@ class MultiHeadAttention(nn.Module):
     def __init__(
         self,
         num_heads: int = 8,
-        d_query_key: int = 64,
-        d_value: int = 64,
         d_model: int = 512,
     ):
-        """Multihead attention block. NOTE we require that num_heads * d_value == d_model
+        """Multihead attention block
 
         Args:
-            num_heads: The number of self attention heads
-            d_query_key: The hidden dimension of the query and key matrices (both shape [L, d_value])
-            d_value: The hidden dimension of the value matrix (shape [L, d_value])
-            d_model: The hidden dimension of the model (output of each layer will be [bs, L, d_model])
+            num_heads: The number of attention heads
+            d_model: The dimension of the model (input and output of this layer will have shape [bs, L, d_model])
 
+        Returns:
+            None
         """
-        # todo: just calculate d_query_key and d_value from num_heads and d_model
         super().__init__()
 
-        if num_heads * d_value != d_model:
+        if d_model % num_heads != 0:
             raise ValueError(
-                f"Received {num_heads=}, {d_value=}, {d_model=} that dont satisfy num_heads * d_value == d_model"
+                f"d_model must be divisible by num_heads since d_model/num_heads is used as"
+                f"the dimension of the query, key, and value tensors. Received {num_heads=}, {d_model=}"
             )
+        d_query = d_model // num_heads
 
         self.Qs = nn.ModuleList(
-            [nn.Linear(d_model, d_query_key, bias=False) for _ in range(num_heads)]
+            [nn.Linear(d_model, d_query, bias=False) for _ in range(num_heads)]
         )
         self.Ks = nn.ModuleList(
-            [nn.Linear(d_model, d_query_key, bias=False) for _ in range(num_heads)]
+            [nn.Linear(d_model, d_query, bias=False) for _ in range(num_heads)]
         )
         self.Vs = nn.ModuleList(
-            [nn.Linear(d_model, d_value, bias=False) for _ in range(num_heads)]
+            [nn.Linear(d_model, d_query, bias=False) for _ in range(num_heads)]
         )
 
-        self.Wout = nn.Linear(num_heads * d_value, d_model, bias=False)
+        self.Wout = nn.Linear(d_model, d_model, bias=False)
 
         # We can just store the self attention values in the instance i guess if we want to look at them later
         self.attentions = None
@@ -54,6 +53,7 @@ class MultiHeadAttention(nn.Module):
         x_value: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
+        """todo: docstring"""
         # Project inputs down to queries, keys, and values
         # todo: do this as matrix multiplication instead of list of nn.Linear modules
         queries = [Q(x_query) for Q in self.Qs]
@@ -76,18 +76,22 @@ class MultiHeadAttention(nn.Module):
 
 if __name__ == "__main__":
     num_heads = 8
-    mha = MultiHeadAttention(num_heads=num_heads)
-    x = torch.randn(1, 10, 512)
-    mask = torch.tril(torch.ones(10, 10))
+    d_model = 256
+    context_length = 10
+    bs = 4
+
+    mha = MultiHeadAttention(num_heads=num_heads, d_model=d_model)
+    x = torch.randn(bs, context_length, d_model)
+    mask = torch.tril(torch.ones(context_length, context_length))
     out = mha(x, x, x, mask)
 
-    # Visualize the attention for each head
+    # Visualize the attention for each head for one element in the batch
     rows = 2
     cols = 4
     fig, axs = plt.subplots(rows, cols, figsize=(10, 20))
     for i in range(num_heads):
         ax = axs[i // cols, i % cols]
-        ax.matshow(mha.attentions[i].squeeze().detach())
+        ax.matshow(mha.attentions[i][2].detach())
         ax.set_title(f"self-attention head {i}")
 
     plt.show()
