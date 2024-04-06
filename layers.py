@@ -1,3 +1,4 @@
+import math
 from typing import Optional
 
 import matplotlib.pyplot as plt
@@ -75,6 +76,30 @@ class MultiHeadAttention(nn.Module):
         return self.Wout(heads)
 
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model: int = 512, max_len: int = 1024, dropout: float = 0.1):
+        """todo: docstring"""
+        super().__init__()
+
+        self.d_model = d_model
+
+        self.dropout = nn.Dropout(p=dropout)
+
+        pos = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2) * (-math.log(10000.0) / self.d_model)
+        )
+        self.pos_enc = torch.zeros(max_len, self.d_model)
+        self.pos_enc[:, 0::2] = torch.sin(pos * div_term)
+        self.pos_enc[:, 1::2] = torch.cos(pos * div_term)
+
+        self.pos_enc = nn.Parameter(self.pos_enc, requires_grad=False)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        enc = x + self.pos_enc[: x.shape[-2], :]
+        return self.dropout(enc)
+
+
 class EncoderLayer(nn.Module):
     def __init__(
         self,
@@ -132,14 +157,20 @@ if __name__ == "__main__":
     # Visualize the attention for each head for one element in the batch
     rows = 2
     cols = 4
-    fig, axs = plt.subplots(rows, cols, figsize=(10, 20))
+    fig, axs = plt.subplots(rows, cols)
     for i in range(num_heads):
         ax = axs[i // cols, i % cols]
         ax.matshow(mha.attentions[i][2].detach())
         ax.set_title(f"self-attention head {i}")
 
-    plt.show()
+    # Visualize positional encoding
+    pe = PositionalEncoding()
+    fig, ax = plt.subplots()
+    ax.matshow(pe.pos_enc)
 
+    # Smoke test to make sure EncoderLayer can do forward pass
     d_ff = 2048
-    enc_block = EncoderLayer(num_heads=num_heads, d_model=d_model, d_feedforward=d_ff)
-    out = enc_block(x, mask)
+    enc_layer = EncoderLayer(num_heads=num_heads, d_model=d_model, d_feedforward=d_ff)
+    out = enc_layer(x, mask)
+
+    plt.show()
