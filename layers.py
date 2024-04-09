@@ -8,7 +8,6 @@ from torch import nn
 from ops import scaled_dot_product_attention
 
 
-# i guess this is technically a sublayer
 class MultiHeadAttention(nn.Module):
     def __init__(
         self,
@@ -77,7 +76,7 @@ class MultiHeadAttention(nn.Module):
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int = 512, max_len: int = 1024, dropout: float = 0.1):
+    def __init__(self, d_model: int = 512, seq_len: int = 1024, dropout: float = 0.1):
         """todo: docstring"""
         super().__init__()
 
@@ -85,11 +84,11 @@ class PositionalEncoding(nn.Module):
 
         self.dropout = nn.Dropout(p=dropout)
 
-        pos = torch.arange(max_len).unsqueeze(1)
+        pos = torch.arange(seq_len).unsqueeze(1)
         div_term = torch.exp(
             torch.arange(0, d_model, 2) * (-math.log(10000.0) / self.d_model)
         )
-        self.pos_enc = torch.zeros(max_len, self.d_model)
+        self.pos_enc = torch.zeros(seq_len, self.d_model)
         self.pos_enc[:, 0::2] = torch.sin(pos * div_term)
         self.pos_enc[:, 1::2] = torch.cos(pos * div_term)
 
