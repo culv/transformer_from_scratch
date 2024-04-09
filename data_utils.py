@@ -31,6 +31,7 @@ class TextClassificationDataset(Dataset):
         return data
 
 
+# todo: maybe just add tokenizer to dataset class
 def tokenize(
     context_length: int,
     tokenizer: Optional[PreTrainedTokenizer] = AutoTokenizer.from_pretrained("gpt2"),
@@ -57,7 +58,7 @@ def tokenize(
             padding="max_length",
             return_tensors="pt",
         )
-        return tokens.input_ids, tokens.attention_mask, y
+        return tokens.input_ids.squeeze(), tokens.attention_mask.squeeze(), y
 
     return transform
 
