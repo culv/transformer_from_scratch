@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch import nn
 
-from ops import scaled_dot_product_attention
+from transformer.ops import scaled_dot_product_attention
 
 
 class MultiHeadAttention(nn.Module):

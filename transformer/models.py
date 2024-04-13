@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch import nn
 
-from layers import EncoderLayer, DecoderLayer, PositionalEncoding
+from transformer.layers import EncoderLayer, DecoderLayer, PositionalEncoding
 
 
 class Encoder(nn.Module):
