@@ -112,6 +112,7 @@ class EncoderLayer(nn.Module):
 
         self.multihead_self_attention = MultiHeadAttention(num_heads, d_model)
         self.layernorm_self_attention = nn.LayerNorm(d_model)
+        self.dropout_self_attention = nn.Dropout(p=dropout)
 
         self.feedforward = nn.Sequential(
             nn.Linear(d_model, d_feedforward),
@@ -119,20 +120,19 @@ class EncoderLayer(nn.Module):
             nn.Linear(d_feedforward, d_model),
         )
         self.layernorm_feedforward = nn.LayerNorm(d_model)
-
-        self.dropout = nn.Dropout(p=dropout)
+        self.dropout_feedforward = nn.Dropout(p=dropout)
 
     def forward(
         self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         """todo: docstring"""
         out = self.multihead_self_attention(x, x, x, mask)
-        out = self.dropout(out)
+        out = self.dropout_self_attention(out)
         out = out + x
         res = self.layernorm_self_attention(out)
 
         out = self.feedforward(res)
-        out = self.dropout(out)
+        out = self.dropout_feedforward(out)
         out = out + res
         out = self.layernorm_feedforward(out)
 
@@ -152,9 +152,11 @@ class DecoderLayer(nn.Module):
 
         self.multihead_self_attention = MultiHeadAttention(num_heads, d_model)
         self.layernorm_self_attention = nn.LayerNorm(d_model)
+        self.dropout_self_attention = nn.Dropout(p=dropout)
 
         self.multihead_source_attention = MultiHeadAttention(num_heads, d_model)
         self.layernorm_source_attention = nn.LayerNorm(d_model)
+        self.dropout_source_attention = nn.Dropout(p=dropout)
 
         self.feedforward = nn.Sequential(
             nn.Linear(d_model, d_feedforward),
@@ -162,8 +164,7 @@ class DecoderLayer(nn.Module):
             nn.Linear(d_feedforward, d_model),
         )
         self.layernorm_feedforward = nn.LayerNorm(d_model)
-
-        self.dropout = nn.Dropout(p=dropout)
+        self.dropout_feedforward = nn.Dropout(p=dropout)
 
     def forward(
         self,
@@ -175,27 +176,28 @@ class DecoderLayer(nn.Module):
         """todo: docstring"""
         # self-attention
         out = self.multihead_self_attention(target, target, target, target_mask)
-        out = self.dropout(out)
+        out = self.dropout_self_attention(out)
         out = out + target
         res = self.layernorm_self_attention(out)
 
         # source-attention
         out = self.multihead_source_attention(res, source, source, source_mask)
-        out = self.dropout(out)
+        out = self.dropout_source_attention(out)
         out = out + res
         res = self.layernorm_source_attention(out)
 
         # feedforward
         out = self.feedforward(res)
-        out = self.dropout(out)
+        out = self.dropout_feedforward(out)
         out = out + res
         out = self.layernorm_feedforward(out)
 
         return out
 
+
 if __name__ == "__main__":
     num_heads = 8
-    d_model = 256
+    d_model = 64
     context_length = 10
     bs = 4
 
@@ -206,11 +208,12 @@ if __name__ == "__main__":
 
     # Visualize the attention for each head for one element in the batch
     rows = 2
-    cols = 4
+    cols = num_heads // rows
+    batch_element = 2
     fig, axs = plt.subplots(rows, cols)
     for i in range(num_heads):
         ax = axs[i // cols, i % cols]
-        ax.matshow(mha.attentions[i][2].detach())
+        ax.matshow(mha.attentions[i][batch_element].detach())
         ax.set_title(f"self-attention head {i}")
 
     # Visualize positional encoding
