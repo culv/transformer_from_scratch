@@ -2,8 +2,21 @@ from typing import Callable, Optional, Tuple
 
 import pandas as pd
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, WeightedRandomSampler
 from transformers import PreTrainedTokenizer, AutoTokenizer
+
+
+class BalancedClassRandomSampler(WeightedRandomSampler):
+    """Given imbalanced class labels, randomly oversample minority class/undersample majority
+    class so that classes appear balanced"""
+
+    def __init__(self, labels: pd.Series):
+        num_classes = len(labels.unique())
+        num_samples = len(labels)
+        samples_per_class = labels.value_counts()
+        weights_per_class = num_samples / (num_classes * samples_per_class)
+        weights = labels.replace(weights_per_class).tolist()
+        super().__init__(weights=weights, num_samples=num_samples, replacement=True)
 
 
 class TextClassificationDataset(Dataset):
