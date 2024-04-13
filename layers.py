@@ -110,17 +110,15 @@ class EncoderLayer(nn.Module):
         """todo: docstring"""
         super().__init__()
 
-        self.multi_head_attention = MultiHeadAttention(num_heads, d_model)
+        self.multihead_self_attention = MultiHeadAttention(num_heads, d_model)
+        self.layernorm_self_attention = nn.LayerNorm(d_model)
 
-        self.multi_head_attention_layernorm = nn.LayerNorm(d_model)
-
-        self.feed_forward = nn.Sequential(
+        self.feedforward = nn.Sequential(
             nn.Linear(d_model, d_feedforward),
             nn.ReLU(),
             nn.Linear(d_feedforward, d_model),
         )
-
-        self.feed_forward_layernorm = nn.LayerNorm(d_model)
+        self.layernorm_feedforward = nn.LayerNorm(d_model)
 
         self.dropout = nn.Dropout(p=dropout)
 
@@ -128,19 +126,72 @@ class EncoderLayer(nn.Module):
         self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         """todo: docstring"""
-        res = x
-        out = self.multi_head_attention(x, x, x, mask)
+        out = self.multihead_self_attention(x, x, x, mask)
         out = self.dropout(out)
-        out = out + res
+        out = out + x
+        res = self.layernorm_self_attention(out)
 
-        res = self.multi_head_attention_layernorm(out)
-        out = self.feed_forward(res)
+        out = self.feedforward(res)
         out = self.dropout(out)
         out = out + res
-        out = self.feed_forward_layernorm(out)
+        out = self.layernorm_feedforward(out)
 
         return out
 
+
+class DecoderLayer(nn.Module):
+    def __init__(
+        self,
+        num_heads: int = 8,
+        d_model: int = 512,
+        d_feedforward: int = 2048,
+        dropout: float = 0.1,
+    ):
+        """todo: docstring"""
+        super().__init__()
+
+        self.multihead_self_attention = MultiHeadAttention(num_heads, d_model)
+        self.layernorm_self_attention = nn.LayerNorm(d_model)
+
+        self.multihead_source_attention = MultiHeadAttention(num_heads, d_model)
+        self.layernorm_source_attention = nn.LayerNorm(d_model)
+
+        self.feedforward = nn.Sequential(
+            nn.Linear(d_model, d_feedforward),
+            nn.ReLU(),
+            nn.Linear(d_feedforward, d_model),
+        )
+        self.layernorm_feedforward = nn.LayerNorm(d_model)
+
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(
+        self,
+        source: torch.Tensor,
+        target: torch.Tensor,
+        source_mask: Optional[torch.Tensor] = None,
+        target_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """todo: docstring"""
+        # self-attention
+        out = self.multihead_self_attention(target, target, target, target_mask)
+        out = self.dropout(out)
+        out = out + target
+        res = self.layernorm_self_attention(out)
+
+        # source-attention
+        out = self.multihead_source_attention(res, source, source, source_mask)
+        out = self.dropout(out)
+        out = out + res
+        res = self.layernorm_source_attention(out)
+
+        # feedforward
+        out = self.feedforward(res)
+        out = self.dropout(out)
+        out = out + res
+        out = self.layernorm_feedforward(out)
+
+        return out
 
 if __name__ == "__main__":
     num_heads = 8
@@ -171,5 +222,9 @@ if __name__ == "__main__":
     d_ff = 2048
     enc_layer = EncoderLayer(num_heads=num_heads, d_model=d_model, d_feedforward=d_ff)
     out = enc_layer(x, mask)
+
+    # Smoke test to make sure DecoderLayer can do forward pass
+    dec_layer = DecoderLayer(num_heads=num_heads, d_model=d_model, d_feedforward=d_ff)
+    out = dec_layer(x, x, mask, mask)
 
     plt.show()
