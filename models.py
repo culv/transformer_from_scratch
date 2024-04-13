@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch import nn
 
-from layers import EncoderLayer, PositionalEncoding
+from layers import EncoderLayer, DecoderLayer, PositionalEncoding
 
 
 class Encoder(nn.Module):
@@ -84,11 +84,64 @@ class EncoderOnlyClassifier(nn.Module):
         return out
 
 
+class Decoder(nn.Module):
+    def __init__(
+        self,
+        num_decoders: int = 6,
+        num_heads: int = 8,
+        d_model: int = 512,
+        d_feedforward: int = 2048,
+        dropout: float = 0.1,
+        seq_len: int = 1024,
+    ):
+        """todo: docstring"""
+        super().__init__()
+        self.pos_enc = PositionalEncoding(
+            d_model=d_model, seq_len=seq_len, dropout=dropout
+        )
+
+        self.decoder_layers = nn.ModuleList(
+            [
+                DecoderLayer(
+                    num_heads=num_heads,
+                    d_model=d_model,
+                    d_feedforward=d_feedforward,
+                    dropout=dropout,
+                )
+                for _ in range(num_decoders)
+            ]
+        )
+
+        # Mask that prevents future tokens from attending to previous tokens
+        self.subsequent_mask = torch.tril(torch.ones(seq_len, seq_len))
+
+    def forward(
+        self,
+        source: torch.Tensor,
+        target: torch.Tensor,
+        source_mask: Optional[torch.Tensor] = None,
+        target_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """todo: docstring"""
+        out = self.pos_enc(target)
+        for decoder in self.decoder_layers:
+            out = decoder(source, out, source_mask, target_mask)
+        return out
+
+
 if __name__ == "__main__":
+    bs = 4
+    context_length = 10
+    d_model = 64
+
     # Smoke test to make sure encoder can do forward pass
-    enc = Encoder()
-    x = torch.randn(4, 10, 512)
+    enc = Encoder(d_model=d_model, seq_len=context_length)
+    x = torch.randn(bs, context_length, d_model)
     out = enc(x)
+
+    # Smoke test for decoder
+    dec = Decoder(d_model=d_model, seq_len=context_length)
+    out = dec(x, out, target_mask=dec.subsequent_mask)
 
     # Smoke test for encoder-only classifier
     x = torch.randint(50256, (4, 160))
@@ -98,6 +151,8 @@ if __name__ == "__main__":
     )
     out = model(x, mask)
     plt.matshow(
-        model.encoder.encoder_layers[0].multi_head_attention.attentions[0][0].detach()
+        model.encoder.encoder_layers[0]
+        .multihead_self_attention.attentions[0][0]
+        .detach()
     )
     plt.show()
