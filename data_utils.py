@@ -19,35 +19,51 @@ class BalancedClassRandomSampler(WeightedRandomSampler):
         super().__init__(weights=weights, num_samples=num_samples, replacement=True)
 
 
-class TextClassificationDataset(Dataset):
+class PandasDataset(Dataset):
+    """A really general dataset, given a CSV file and the labels for input/output
+    columns, it will return the (input, output) for a given index. If input/output
+    transforms were given, it'll apply those first and return the result"""
+
     def __init__(
         self,
         filepath: str,
-        x_column: str,
-        y_column: str,
+        input_column: str,
+        output_column: str,
+        input_transform: Optional[Callable] = None,
+        output_transform: Optional[Callable] = None,
         encoding: Optional[str] = "utf8",
-        transform: Optional[Callable] = None,
     ):
-        """todo: docstring"""
+        # todo: for really large CSV files, dont load entire df into memory
         self.df = pd.read_csv(filepath, encoding=encoding)
-        self.x_column = x_column
-        self.y_column = y_column
-        self.transform = transform
+        self.input_column = input_column
+        self.output_column = output_column
+        self.input_transform = input_transform
+        self.output_transform = output_transform
 
     def __len__(self) -> int:
         return len(self.df)
 
     def __getitem__(self, idx: int) -> Tuple:
-        data = tuple(self.df.loc[idx, [self.x_column, self.y_column]])
-        if self.transform:
-            data = self.transform(data)
-        return data
+        input = self.df.loc[idx][self.input_column]
+        output = self.df.loc[idx][self.output_column]
+
+        # todo: handle lists of transforms as well
+        if self.input_transform:
+            input = self.input_transform(input)
+
+        if self.output_transform:
+            output = self.output_transform(output)
+
+        return input, output
+
+
+Gpt2Tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
 
 # todo: maybe just add tokenizer to dataset class
 def tokenize(
     context_length: int,
-    tokenizer: Optional[PreTrainedTokenizer] = AutoTokenizer.from_pretrained("gpt2"),
+    tokenizer: Optional[PreTrainedTokenizer] = Gpt2Tokenizer,
 ) -> Callable:
     """On-the-fly transform for a dataset. Rather than the dataset returning (text, label), this will
     tokenize the text and return (tokens, mask, label)
@@ -61,32 +77,45 @@ def tokenize(
     """
     tokenizer.pad_token = tokenizer.eos_token
 
-    def transform(data: Tuple[str, int]) -> Tuple[torch.Tensor, torch.Tensor, int]:
-        """Given a data-label pair (text, label), tokenize the text and return (tokens, mask, label)"""
-        x, y = data
-        tokens = tokenizer(
-            x,
+    def transform(text: str) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Given some text, tokenize it and return (token_ids, mask)"""
+        output = tokenizer(
+            text,
             max_length=context_length,
             truncation=True,
             padding="max_length",
             return_tensors="pt",
         )
-        return tokens.input_ids.squeeze(), tokens.attention_mask.squeeze(), y
+        token_ids = output.input_ids.squeeze()
+        mask = output.attention_mask.squeeze()
+        return token_ids, mask
 
     return transform
 
 
 if __name__ == "__main__":
+    # Testing out a classification dataset (text -> label)
     data_path = "data/Womens_Clothing_E-Commerce_Reviews_CLEANED.csv"
-    ds = TextClassificationDataset(
-        data_path, x_column="review", y_column="Recommended IND"
+    ds = PandasDataset(
+        data_path, input_column="review", output_column="Recommended IND"
     )
     print(ds[0])
 
-    ds = TextClassificationDataset(
+    ds = PandasDataset(
         data_path,
-        x_column="review",
-        y_column="Recommended IND",
-        transform=tokenize(160),
+        input_column="review",
+        output_column="Recommended IND",
+        input_transform=tokenize(160),
+    )
+    print(ds[0])
+
+    # Testing out a translation dataset (text -> text)
+    data_path = "data/translation.csv"
+    ds = PandasDataset(
+        data_path,
+        input_column="en",
+        output_column="fr",
+        input_transform=tokenize(10),
+        output_transform=tokenize(10),
     )
     print(ds[0])

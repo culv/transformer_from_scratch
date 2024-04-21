@@ -14,14 +14,14 @@ def scaled_dot_product_attention(
     """Compute scaled dot product attention for the given key/query/value.
 
     Args:
-        query (torch.Tensor): Tensor with shape [..., L, d_query] where L is the length of the sequence
-        key (torch.Tensor): Tensor with shape [..., L, d_key]
-        value (torch.Tensor): Tensor with shape [..., L, d_value]
-        mask (torch.Tensor): Optional mask to apply to attention scores (with shape [..., L, L])
+        query (torch.Tensor): Tensor with shape [bs, L, d_query] where L is the length of the sequence
+        key (torch.Tensor): Tensor with shape [bs, L, d_key]
+        value (torch.Tensor): Tensor with shape [bs, L, d_value]
+        mask (torch.Tensor): Optional mask to apply to attention scores (with shape [bs, L, L])
 
     Returns:
-        output: The final result of scaled dot product attention
-        attention: A [..., L, L] tensor representing the attention
+        output: The final result of scaled dot product attention (with shape [bs, L, d_value])
+        attention: A [bs, L, L] tensor representing the attention
     """
     d_k = key.shape[-1]
     attention = torch.matmul(query, key.transpose(-1, -2))
