@@ -63,7 +63,8 @@ Gpt2Tokenizer = AutoTokenizer.from_pretrained("gpt2")
 # todo: maybe just add tokenizer to dataset class
 def tokenize(
     context_length: int,
-    tokenizer: Optional[PreTrainedTokenizer] = Gpt2Tokenizer,
+    padding_side: str = "right",
+    tokenizer: Optional[PreTrainedTokenizer] = None,
 ) -> Callable:
     """On-the-fly transform for a dataset. Rather than the dataset returning (text, label), this will
     tokenize the text and return (tokens, mask, label)
@@ -75,7 +76,10 @@ def tokenize(
     Returns:
         transform: A method to transform incoming data from (text, label) to (tokens, mask, label)
     """
+    if tokenizer is None:
+        tokenizer = AutoTokenizer.from_pretrained("gpt2")
     tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = padding_side
 
     def transform(text: str) -> Tuple[torch.Tensor, torch.Tensor]:
         """Given some text, tokenize it and return (token_ids, mask)"""
@@ -94,6 +98,8 @@ def tokenize(
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
     # Testing out a classification dataset (text -> label)
     data_path = "data/Womens_Clothing_E-Commerce_Reviews_CLEANED.csv"
     ds = PandasDataset(
@@ -107,7 +113,7 @@ if __name__ == "__main__":
         output_column="Recommended IND",
         input_transform=tokenize(160),
     )
-    print(ds[0])
+    print(ds[1])
 
     # Testing out a translation dataset (text -> text)
     data_path = "data/translation.csv"
@@ -116,6 +122,10 @@ if __name__ == "__main__":
         input_column="en",
         output_column="fr",
         input_transform=tokenize(10),
-        output_transform=tokenize(10),
+        output_transform=tokenize(10, padding_side="left"),
     )
-    print(ds[0])
+    print(ds[1])
+    (src, src_mask), (trg, trg_mask) = ds[1]
+    plt.matshow(src_mask.unsqueeze(0))
+    plt.matshow(trg_mask.unsqueeze(0))
+    plt.show()
