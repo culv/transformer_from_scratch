@@ -34,7 +34,8 @@ class PandasDataset(Dataset):
         encoding: Optional[str] = "utf8",
     ):
         # todo: for really large CSV files, dont load entire df into memory
-        self.df = pd.read_csv(filepath, encoding=encoding)
+        # for now, just reading the first couple million
+        self.df = pd.read_csv(filepath, encoding=encoding, nrows=2e6)
         self.input_column = input_column
         self.output_column = output_column
         self.input_transform = input_transform
