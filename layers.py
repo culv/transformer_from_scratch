@@ -18,7 +18,7 @@ class MultiHeadAttention(nn.Module):
 
         Args:
             num_heads: The number of attention heads
-            d_model: The dimension of the model (input and output of this layer will have shape [bs, L, d_model])
+            d_model: The hidden dimension of the model
 
         Returns:
             None
@@ -32,14 +32,14 @@ class MultiHeadAttention(nn.Module):
             )
         d_query = d_model // num_heads
 
-        self.Qs = nn.ModuleList(
-            [nn.Linear(d_model, d_query, bias=False) for _ in range(num_heads)]
+        self.Q = nn.Parameter(
+            torch.randn(num_heads, d_model, d_query), requires_grad=True
         )
-        self.Ks = nn.ModuleList(
-            [nn.Linear(d_model, d_query, bias=False) for _ in range(num_heads)]
+        self.K = nn.Parameter(
+            torch.randn(num_heads, d_model, d_query), requires_grad=True
         )
-        self.Vs = nn.ModuleList(
-            [nn.Linear(d_model, d_query, bias=False) for _ in range(num_heads)]
+        self.V = nn.Parameter(
+            torch.randn(num_heads, d_model, d_query), requires_grad=True
         )
 
         self.Wout = nn.Linear(d_model, d_model, bias=False)
@@ -54,25 +54,25 @@ class MultiHeadAttention(nn.Module):
         x_value: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """todo: docstring"""
-        # Project inputs down to queries, keys, and values
-        # todo: do this as matrix multiplication instead of list of nn.Linear modules
-        queries = [Q(x_query) for Q in self.Qs]
-        keys = [K(x_key) for K in self.Ks]
-        values = [V(x_value) for V in self.Vs]
+        """Project inputs down to queries, keys, and values and then perform scaled dot product attention."""
+        # Project inputs to queries/keys/values
+        # Note:
+        #   * Q has shape [num_heads, d_model, d_query]
+        #   * x_query has shape [bs, L, d_model]
+        # We need to add singleton dimensions to make:
+        #   * Q have shape [1, num_heads, d_model, d_query] and
+        #   * x_query have shape [bs, 1, L, d_model]
+        # before doing our matrix multiply so that everything is broadcasted correctly
+        # The result of the matrix multiply has shape [bs, num_heads, L, d_query]
+        q = torch.matmul(x_query.unsqueeze(1), self.Q.unsqueeze(0))
+        k = torch.matmul(x_key.unsqueeze(1), self.K.unsqueeze(0))
+        v = torch.matmul(x_value.unsqueeze(1), self.V.unsqueeze(0))
 
-        # Apply attention
-        attention_output = [
-            scaled_dot_product_attention(q, k, v, mask)
-            for q, k, v in zip(queries, keys, values)
-        ]
-        heads = [a[0] for a in attention_output]
-        self.attentions = [a[1] for a in attention_output]
+        # Perform scaled dot product attention
+        heads, self.attentions = scaled_dot_product_attention(q, k, v, mask)
 
-        # Concat heads together
-        heads = torch.concat(heads, dim=-1)
-
-        return self.Wout(heads)
+        # Concat heads together and project
+        return self.Wout(heads.view(q.shape[0], q.shape[2], -1))
 
 
 class PositionalEncoding(nn.Module):
