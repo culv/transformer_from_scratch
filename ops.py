@@ -28,6 +28,11 @@ def scaled_dot_product_attention(
     attention /= math.sqrt(d_k)
 
     if mask is not None:
+        # The mask must be broadcastable with attention, so we may have to add a singleton dimension
+        # Usually this is the case for multihead attention where attention is [bs, num_heads, L, L]
+        # but the mask is [bs, L, L]
+        if len(mask.shape) != len(attention.shape):
+            mask = mask.unsqueeze(1)
         attention = attention.masked_fill(mask == 0, -1e9)
 
     attention = F.softmax(attention, dim=-1)
