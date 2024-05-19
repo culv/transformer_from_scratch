@@ -32,14 +32,24 @@ class MultiHeadAttention(nn.Module):
             )
         d_query = d_model // num_heads
 
+        # Use same weight initilization as nn.Linear
         self.Q = nn.Parameter(
-            torch.randn(num_heads, d_model, d_query), requires_grad=True
+            torch.nn.init.kaiming_uniform_(
+                torch.empty(num_heads, d_model, d_query), a=math.sqrt(5)
+            ),
+            requires_grad=True,
         )
         self.K = nn.Parameter(
-            torch.randn(num_heads, d_model, d_query), requires_grad=True
+            torch.nn.init.kaiming_uniform_(
+                torch.empty(num_heads, d_model, d_query), a=math.sqrt(5)
+            ),
+            requires_grad=True,
         )
         self.V = nn.Parameter(
-            torch.randn(num_heads, d_model, d_query), requires_grad=True
+            torch.nn.init.kaiming_uniform_(
+                torch.empty(num_heads, d_model, d_query), a=math.sqrt(5)
+            ),
+            requires_grad=True,
         )
 
         self.Wout = nn.Linear(d_model, d_model, bias=False)
