@@ -73,9 +73,6 @@ class Decoder(nn.Module):
             ]
         )
 
-        # Mask that prevents future tokens from attending to previous tokens
-        self.subsequent_mask = torch.tril(torch.ones(seq_len, seq_len)).unsqueeze(0)
-
     def forward(
         self,
         source: torch.Tensor,
@@ -85,12 +82,6 @@ class Decoder(nn.Module):
     ) -> torch.Tensor:
         """todo: docstring"""
         out = self.pos_enc(target)
-
-        # todo: maybe this should be moved to DecoderLayer?
-        # Combine target and subsequent masks
-        if target_mask is not None:
-            target_mask = target_mask * self.subsequent_mask
-
         for decoder in self.decoder_layers:
             out = decoder(source, out, source_mask, target_mask)
         return out
