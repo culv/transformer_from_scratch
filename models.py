@@ -171,10 +171,7 @@ class Seq2Seq(nn.Module):
         )
 
         # Project output of final decoder layer to logits over token space
-        self.projection = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(seq_len * d_model, num_tokens),
-        )
+        self.projection = nn.Linear(d_model, num_tokens)
 
     def forward(
         self,
